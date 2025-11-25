@@ -14,9 +14,15 @@ from openai import OpenAI
 # -------------------------------------------------------
 load_dotenv()
 
+# ✅ import the stripe routes module from app/routes/stripe.py
+from .routes import stripe
+
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/oauth/gmail/callback")
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "http://localhost:8000/oauth/gmail/callback"
+)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 GMAIL_TEST_RECIPIENT = os.getenv("GMAIL_TEST_RECIPIENT")
 
@@ -28,6 +34,7 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 # token file (single-user MVP)
 TOKENS_FILE = Path("tokens.json")
 
+
 def save_tokens(data: dict):
     expires_in = data.get("expires_in", 3600)
     tokens = {
@@ -36,6 +43,7 @@ def save_tokens(data: dict):
         "expiry": time.time() + expires_in - 60,
     }
     TOKENS_FILE.write_text(json.dumps(tokens))
+
 
 def load_tokens():
     if not TOKENS_FILE.exists():
@@ -51,6 +59,7 @@ def load_tokens():
 
     refreshed = refresh_access_token(tokens["refresh_token"])
     return refreshed
+
 
 def refresh_access_token(refresh_token: str):
     data = {
@@ -69,6 +78,7 @@ def refresh_access_token(refresh_token: str):
     save_tokens(token_data)
     return json.loads(TOKENS_FILE.read_text())
 
+
 # -------------------------------------------------------
 # FastAPI
 # -------------------------------------------------------
@@ -82,12 +92,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ use the router object from the imported stripe module
+app.include_router(stripe.router)
+
+
 # -------------------------------------------------------
 # Health Route
 # -------------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 # -------------------------------------------------------
 # Google OAuth Start
@@ -107,8 +122,10 @@ def oauth_start():
     }
 
     import urllib.parse
+
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
     return {"oauth_url": url}
+
 
 # -------------------------------------------------------
 # Google OAuth Callback
@@ -131,6 +148,7 @@ def oauth_callback(code: str):
 
     return RedirectResponse(url=f"{FRONTEND_URL}/dashboard")
 
+
 # -------------------------------------------------------
 # Connection Status
 # -------------------------------------------------------
@@ -140,6 +158,7 @@ def connection_status():
     if not tokens:
         return {"status": "not_connected"}
     return {"status": "connected"}
+
 
 # -------------------------------------------------------
 # Send Test Email
@@ -157,14 +176,16 @@ async def send_gmail_email(access_token: str, to: str, subject: str, body: str):
         resp = await client.post(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
             headers=headers,
-            json=payload
+            json=payload,
         )
 
         if resp.status_code >= 400:
             raise HTTPException(500, resp.text)
 
+
 class TestResult(BaseModel):
     detail: str
+
 
 @app.post("/test-email", response_model=TestResult)
 async def test_email():
@@ -179,10 +200,11 @@ async def test_email():
         tokens["access_token"],
         GMAIL_TEST_RECIPIENT,
         "LiquidMail Test",
-        "This is a test email from LiquidMail!"
+        "This is a test email from LiquidMail!",
     )
 
     return TestResult(detail="Email sent!")
+
 
 # -------------------------------------------------------
 # AI Reply
@@ -190,6 +212,7 @@ async def test_email():
 class ReplyRequest(BaseModel):
     sender_name: str | None = None
     email_text: str
+
 
 @app.post("/generate-reply")
 def generate_reply(req: ReplyRequest):
