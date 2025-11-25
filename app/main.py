@@ -176,6 +176,12 @@ def gmail_connect(user_email: str):
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
     return {"oauth_url": url}
 
+# ------ OAuth status ------
+@app.get("/gmail/status")
+def gmail_status(user_email: str):
+    token = get_valid_access_token(user_email)
+    return {"connected": token is not None}
+
 # ------ OAuth callback ------
 @app.get("/gmail/callback")
 def gmail_callback(code: str, state: str):
